@@ -6,32 +6,22 @@ var semver = require('semver');
 var createBar = require('multimeter')(process);
 var path = require('path');
 var fs = require('fs');
-
-var v = semver.parse(require('../package.json').version);
-var version = [v.major, v.minor, v.patch].join('.');
-if (v.prerelease && typeof v.prerelease[0] === 'string') {
-  version += '-' + v.prerelease[0];
-}
-var url = false;
-var urlBase = 'http://dl.node-webkit.org/v';
-
-// Determine download url
-if (process.platform === 'darwin') {
-  url = urlBase + version + '/node-webkit-v' + version + '-osx-ia32.zip';
-} else if (process.platform === 'win32') {
-  url = urlBase + version + '/node-webkit-v' + version + '-win-ia32.zip';
-} else if (process.arch === 'ia32') {
-  url = urlBase + version + '/node-webkit-v' + version + '-linux-ia32.tar.gz';
-} else if (process.arch === 'x64') {
-  url = urlBase + version + '/node-webkit-v' + version + '-linux-x64.tar.gz';
-}
+var platform = require('../lib/platform');
 
 function error(e) {
   console.error((typeof e === 'string') ? e : e.message);
   process.exit(0);
 }
 
-if (!url) error('Could not find a compatible version of node-webkit to download for your platform.');
+if (!platform.isValid()) error('Could not find a compatible version of node-webkit to download for your platform.');
+
+var v = semver.parse(require('../package.json').version);
+var version = [v.major, v.minor, v.patch].join('.');
+if (v.prerelease && typeof v.prerelease[0] === 'string') {
+  version += '-' + v.prerelease[0];
+}
+
+var url = platform.url(version);
 
 var dest = path.resolve(__dirname, '..', 'nodewebkit');
 rimraf.sync(dest);
