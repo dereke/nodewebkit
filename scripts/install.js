@@ -16,32 +16,66 @@ function error(e) {
 if (!platform.isValid()) error('Could not find a compatible version of node-webkit to download for your platform.');
 
 var v = semver.parse(require('../package.json').version);
-var version = [v.major, v.minor, v.patch].join('.');
+var nodeWebkitVersion = [v.major, v.minor, v.patch].join('.');
 if (v.prerelease && typeof v.prerelease[0] === 'string') {
-  version += '-' + v.prerelease[0];
+  nodeWebkitVersion += '-' + v.prerelease[0];
 }
+var seleniumVersion = [v.major, v.minor, 0].join('.');
 
-var url = platform.url(version);
+var nodeWebKitUrl = platform.url('nodewebkit', nodeWebkitVersion);
+var seleniumUrl = platform.url('selenium', seleniumVersion);
 
 var dest = path.resolve(__dirname, '..', 'nodewebkit');
 rimraf.sync(dest);
 
-var bar = createBar({ before: url + ' [' });
+var finished = []
+function finish(name){
+  finished.push(name);
+  if (finished.length == 2) {
+    process.nextTick(function() {
+      process.exit()
+    });
+  }
+}
 
-var total = 0;
-var progress = 0;
-var d = download(url, dest, { extract: true, strip: 1 });
-d.on('response', function(res) {
-  total = parseInt(res.headers['content-length']);
-});
-d.on('data', function(data) {
-  progress += data.length;
-  if (total > 0) {
-    var percent = progress / total * 100;
-    bar.percent(percent);
+var nodeWebKitbar = createBar({ before: nodeWebKitUrl + ' [' });
+var seleniumBar = createBar.rel(0, 1,{ before: seleniumUrl + ' [' });
+
+var seleniumTotal = 0;
+var seleniumProgress = 0;
+download(seleniumUrl, dest, { extract: true, strip: 1 })
+  .on('response', function(res) {
+    seleniumTotal = parseInt(res.headers['content-length']);
+  })
+  .on('data', function(data) {
+  seleniumProgress += data.length;
+  if (seleniumTotal > 0) {
+    var percent = seleniumProgress / seleniumTotal * 100;
+    seleniumBar.percent(percent);
     if (percent >= 100) {
       console.log('');
-      console.log('Extracting...');
+      console.log('Extracting selenium...');
+    }
+  }
+  })
+  .on('close', function(){
+    finish('selenium');
+  });
+
+var nodeWebKitTotal = 0;
+var nodeWebKitProgress = 0;
+var d = download(nodeWebKitUrl, dest, { extract: true, strip: 1 });
+d.on('response', function(res) {
+  nodeWebKitTotal = parseInt(res.headers['content-length']);
+});
+d.on('data', function(data) {
+  nodeWebKitProgress += data.length;
+  if (nodeWebKitTotal > 0) {
+    var percent = nodeWebKitProgress / nodeWebKitTotal * 100;
+    nodeWebKitbar.percent(percent);
+    if (percent >= 100) {
+      console.log('');
+      console.log('Extracting nodewebkit...');
     }
   }
 });
@@ -73,7 +107,5 @@ d.on('close', function() {
       }
     });
   }
-  process.nextTick(function() {
-    process.exit();
-  });
+  finish('nodewebkit');
 });
